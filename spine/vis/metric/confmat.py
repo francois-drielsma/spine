@@ -60,7 +60,7 @@ def draw_confusion_matrix(file_path, num_classes=None, mapping=None,
     plt.pcolormesh(xedges, yedges, hist_norm, cmap='Blues')
     for i in range(num_classes):
         for j in range(num_classes):
-            label = '{:0.3f}\n({})'.format(hist_norm[i,j], int(hist[i,j])) if show_counts else '{:0.3f}'.format(hist_norm[i,j])
+            label = '{:0.3f}\n({:.1e})'.format(hist_norm[i,j], int(hist[i,j])) if show_counts else '{:0.3f}'.format(hist_norm[i,j])
             plt.text(j, i, label, color='white' if hist_norm[i,j] > 0.5 else 'black', ha='center', va='center')
             
     # Set axes style and labels
