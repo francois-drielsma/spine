@@ -33,6 +33,8 @@ class OutBase(PosDataBase):
         (M) List of module indexes that make up this object
     is_contained : bool
         Whether this object is fully contained within the detector
+    is_logical_contained : bool
+        Whether this object's points' modules agree with the modules they are reconstructed in.
     is_matched: bool
         True if a true object match was found
     match_ids : np.ndarray
@@ -59,6 +61,7 @@ class OutBase(PosDataBase):
     sources: np.ndarray = None
     module_ids: np.ndarray = None
     is_contained: bool = False
+    is_logical_contained: bool = True #Default to True for backwards compatibility
     is_matched: bool = False
     match_ids: np.ndarray = None
     match_overlaps: np.ndarray = None
@@ -77,7 +80,7 @@ class OutBase(PosDataBase):
 
     # Boolean attributes
     _bool_attrs = (
-            'is_contained', 'is_matched', 'is_cathode_crosser', 'is_truth'
+            'is_contained', 'is_logical_contained', 'is_matched', 'is_cathode_crosser', 'is_truth'
     )
 
     # Attributes to concatenate when merging objects

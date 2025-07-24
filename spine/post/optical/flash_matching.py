@@ -178,6 +178,12 @@ class FlashMatchProcessor(PostBase):
                 # Crop interactions to only include depositions in the optical volume
                 interactions_v = []
                 for inter in interactions:
+                    #Check if the interaction is valid. It's invalid if...
+                    # - It has a cathode crosser
+                    # - It is not logically contained
+                    if inter.has_cathode_crosser or not inter.is_logical_contained:
+                        continue
+
                     # Fetch the points in the current optical volume
                     sources = self.get_sources(inter)
                     if self.volume == 'module':

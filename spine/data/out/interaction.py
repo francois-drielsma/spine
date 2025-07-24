@@ -295,6 +295,17 @@ class InteractionBase:
             setattr(interaction, attr, np.concatenate(val_list))
 
         return interaction
+    
+    @property
+    def has_cathode_crosser(self):
+        """Check if the interaction has a cathode crosser
+
+        Returns
+        -------
+        bool
+            True if the interaction has a cathode crosser, False otherwise
+        """
+        return any(part.is_cathode_crosser for part in self.primary_particles)
 
 
 @dataclass(eq=False)

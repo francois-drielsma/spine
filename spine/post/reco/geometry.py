@@ -22,13 +22,13 @@ class ContainmentProcessor(PostBase):
     name = 'containment'
 
     # Alternative allowed names of the post-processor
-    aliases = ('check_containment',)
+    aliases = ('check_containment','logical_containment')
 
     def __init__(self, margin, cathode_margin=None, detector=None,
                  geometry_file=None, mode='module', allow_multi_module=False,
                  exclude_pids=None, min_particle_sizes=0,
                  obj_type=('particle', 'interaction'),
-                 truth_point_mode='points', run_mode='both'):
+                 truth_point_mode='points', run_mode='both', fill_attr='is_contained'):
         """Initialize the containment conditions.
 
         If the `source` method is used, the cut will be based on the source of
@@ -70,6 +70,8 @@ class ContainmentProcessor(PostBase):
             When checking interaction containment, ignore particles below the
             size (in voxel count) specified by this parameter. If specified
             as a dictionary, it maps a specific particle type to its own cut.
+        fill_attr : str, default 'is_contained'
+            Particle / Interaction attribute to fill with the containment status.
         """
         # Initialize the parent class
         super().__init__(obj_type, run_mode, truth_point_mode)
@@ -111,6 +113,8 @@ class ContainmentProcessor(PostBase):
                 self.min_particle_sizes[pid] = min_particle_sizes['default']
             else:
                 self.min_particle_sizes[pid] = 0
+        
+        self.fill_attr = fill_attr
 
     def process(self, data):
         """Check the containment of all objects in one entry.
@@ -133,30 +137,30 @@ class ContainmentProcessor(PostBase):
                 # Get point coordinates
                 points = self.get_points(obj)
                 if not len(points):
-                    obj.is_contained = True
+                    setattr(obj, self.fill_attr, True)
                     continue
 
                 # Check particle containment against detector/meta
                 if not self.use_meta:
                     if not obj.is_truth or self.truth_geo is None:
                         sources = self.get_sources(obj)
-                        obj.is_contained = self.geo.check_containment(
-                                points, sources, self.allow_multi_module)
+                        setattr(obj, self.fill_attr, self.geo.check_containment(
+                                points, sources, self.allow_multi_module))
                     else:
-                        obj.is_contained = self.truth_geo.check_containment(
-                                points, allow_multi_module=self.allow_multi_module)
+                        setattr(obj, self.fill_attr, self.truth_geo.check_containment(
+                                points, allow_multi_module=self.allow_multi_module))
                 else:
-                    obj.is_contained = (
+                    setattr(obj, self.fill_attr, (
                             (points > (meta.lower + self.margin)).all() and
-                            (points < (meta.upper - self.margin)).all())
+                            (points < (meta.upper - self.margin)).all()))
 
         # Loop over interaction objects
         for k in self.interaction_keys:
             for inter in data[k]:
                 # Check that all the particles in the interaction are contained
-                inter.is_contained = True
+                setattr(inter, self.fill_attr, True)
                 for part in inter.particles:
-                    if not part.is_contained:
+                    if not getattr(part, self.fill_attr):
                         # Do not check for particles with excluded PID
                         if (self.exclude_pids is not None and
                             part.pid in self.exclude_pids):
@@ -167,7 +171,7 @@ class ContainmentProcessor(PostBase):
                             part.size < self.min_particle_sizes[part.pid]):
                             continue
 
-                        inter.is_contained = False
+                        setattr(inter, self.fill_attr, False)
                         break
 
 
