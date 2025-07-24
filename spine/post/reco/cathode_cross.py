@@ -82,6 +82,7 @@ class CathodeCrosserProcessor(PostBase):
             keys['points'] = True
         if run_mode != 'reco':
             keys[truth_point_mode] = True
+        keys['meta'] = True #Needed to find shift in the cathode
         self.update_keys(keys)
 
     def process(self, data):
@@ -92,6 +93,8 @@ class CathodeCrosserProcessor(PostBase):
         data : dict
             Dictionary of data products
         """
+        #Get the drift pixel resolution
+        dx_res = data['meta'].size[0]
         # Reset all particle/interaction matches, they are broken by merging
         for obj_key in self.obj_keys:
             for obj in data[obj_key]:
@@ -137,7 +140,7 @@ class CathodeCrosserProcessor(PostBase):
                 if (part.is_cathode_crosser and self.adjust_crossers and
                     len(tpcs) == 2):
                     # Adjust positions
-                    self.adjust_positions(data, i)
+                    self.adjust_positions(data, i, dx_res=dx_res)
 
             # If we do not want to merge broken crossers, our job here is done
             if not self.merge_crossers:
@@ -214,7 +217,7 @@ class CathodeCrosserProcessor(PostBase):
                     # If compatible, merge
                     if compat:
                         # Merge particle and adjust positions
-                        self.adjust_positions(data, ci, cj, truth=pi.is_truth)
+                        self.adjust_positions(data, ci, cj, truth=pi.is_truth, dx_res=dx_res)
 
                         # Update the candidate list to remove matched particle
                         candidate_ids[j:-1] = candidate_ids[j+1:] - 1
@@ -247,7 +250,7 @@ class CathodeCrosserProcessor(PostBase):
 
         return update_dict
 
-    def adjust_positions(self, data, idx_i, idx_j=None, truth=False):
+    def adjust_positions(self, data, idx_i, idx_j=None, truth=False, dx_res=None):
         """Given a cathode crosser (either in one or two pieces), apply the
         necessary position offsets to match it at the cathode.
 
@@ -261,6 +264,8 @@ class CathodeCrosserProcessor(PostBase):
             Index of a matched cathode crosser fragment
         truth : bool, default False
             If True, adjust truth object positions
+        dx_res : float, optional
+            Drift pixel resolution in cm
         Results
         -------
         np.ndarray
@@ -273,6 +278,9 @@ class CathodeCrosserProcessor(PostBase):
         points_key = 'points' if not truth else self.truth_point_key
         particles = data[part_key]
         if idx_j is not None:
+            # Unmatch the particles from their interactions
+            particles[idx_i].unmatch()
+            particles[idx_j].unmatch()
             # Merge particles
             int_id_i = particles[idx_i].interaction_id
             int_id_j = particles[idx_j].interaction_id
@@ -324,18 +332,18 @@ class CathodeCrosserProcessor(PostBase):
                     continue
 
                 # Update the sister position and the main position tensor
-                self.get_points(sister)[tpc_index, daxis] -= offsets[i]
-                data[points_key][index, daxis] -= offsets[i]
+                self.get_points(sister)[tpc_index, daxis] -= offsets[i] + dx_res
+                data[points_key][index, daxis] -= offsets[i] + dx_res
 
                 # Update the start/end points appropriately
                 if sister.id == idx_i:
                     for attr, closest_tpc in closest_tpcs.items():
                         if closest_tpc == t:
-                            getattr(sister, attr)[daxis] -= offsets[i]
+                            getattr(sister, attr)[daxis] -= offsets[i] + dx_res
 
                 else:
-                    sister.start_point[daxis] -= offsets[i]
-                    sister.end_point[daxis] -= offsets[i]
+                    sister.start_point[daxis] -= offsets[i] + dx_res
+                    sister.end_point[daxis] -= offsets[i] + dx_res
 
         # Store crosser information
         particle.is_cathode_crosser = True
@@ -387,7 +395,6 @@ class CathodeCrosserProcessor(PostBase):
             Module ID
         tpcs : List[int]
             List of TPC IDs
-
         Returns
         -------
         np.ndarray
